@@ -1,14 +1,13 @@
 from flask import Flask, jsonify, request
-import yt_dlp, os, tempfile, json
+import yt_dlp, os
 
 app = Flask(__name__)
 API_KEY = os.environ.get('API_KEY', 'changeme')
-COOKIES_FILE = '/app/cookies.txt'  # Mount hoặc set qua env
+COOKIES_FILE = '/app/cookies.txt'
 
 @app.route('/health')
 def health():
-    has_cookies = os.path.exists(COOKIES_FILE)
-    return jsonify({'status': 'ok', 'cookies': has_cookies})
+    return jsonify({'status': 'ok', 'cookies': os.path.exists(COOKIES_FILE)})
 
 @app.route('/get-url')
 def get_url():
@@ -20,13 +19,12 @@ def get_url():
         return jsonify({'error': 'Missing ?id=VIDEO_ID'}), 400
 
     ydl_opts = {
-        'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[ext=mp4]/best',
+        'format': 'best[ext=mp4]/best',   # ← đơn giản nhất, luôn có
         'quiet': True,
         'no_warnings': True,
         'skip_download': True,
     }
 
-    # Thêm cookies nếu có file
     if os.path.exists(COOKIES_FILE):
         ydl_opts['cookiefile'] = COOKIES_FILE
 
@@ -39,7 +37,6 @@ def get_url():
             url = info.get('url')
             if not url and info.get('formats'):
                 url = info['formats'][-1].get('url')
-
             if not url:
                 return jsonify({'error': 'No URL found'}), 404
 
@@ -55,17 +52,13 @@ def get_url():
 
 @app.route('/set-cookies', methods=['POST'])
 def set_cookies():
-    """Endpoint để upload cookies.txt content"""
     if request.headers.get('X-API-Key') != API_KEY:
         return jsonify({'error': 'Unauthorized'}), 401
-
     content = request.data.decode('utf-8')
     if not content.strip():
         return jsonify({'error': 'Empty cookies'}), 400
-
     with open(COOKIES_FILE, 'w') as f:
         f.write(content)
-
     return jsonify({'status': 'ok', 'message': 'Cookies saved'})
 
 if __name__ == '__main__':
